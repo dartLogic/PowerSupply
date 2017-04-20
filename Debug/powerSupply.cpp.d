@@ -136,7 +136,7 @@ E:\documents\ARDUINO\buildfolder\powerSupply\arduino_due_x_dbg\Debug\powerSupply
  C:\Users\Rohit\AppData\Local\arduino15\packages\arduino\hardware\sam\1.6.11\cores\arduino/USB/USBAPI.h \
  C:\Users\Rohit\AppData\Local\arduino15\packages\arduino\hardware\sam\1.6.11\cores\arduino/RingBuffer.h \
  C:\Users\Rohit\AppData\Local\arduino15\packages\arduino\hardware\sam\1.6.11\cores\arduino/Stream.h \
- C:\Program\ Files\ (x86)\Arduino\libraries\LiquidCrystal\src/LiquidCrystal.h \
- C:\Users\Rohit\AppData\Local\arduino15\packages\arduino\hardware\sam\1.6.11\cores\arduino/Print.h \
  C:\Program\ Files\ (x86)\Arduino\libraries\Keypad\src/Keypad.h \
- C:\Program\ Files\ (x86)\Arduino\libraries\Keypad\src/Key.h
+ C:\Program\ Files\ (x86)\Arduino\libraries\Keypad\src/Key.h \
+ C:\Program\ Files\ (x86)\Arduino\libraries\LiquidCrystal\src/LiquidCrystal.h \
+ C:\Users\Rohit\AppData\Local\arduino15\packages\arduino\hardware\sam\1.6.11\cores\arduino/Print.h
