@@ -5,7 +5,6 @@ unsigned currentMillis;
 unsigned prevMillis = 0;
 
 #include <Keypad.h>
-
 const byte keypadRows = 4; //number of rows on the keypad
 const byte keypadCols = 4; //number of columns on the keypad
 
@@ -33,14 +32,16 @@ const int lcdCols = 20;
 //LCD pins= RS = 34, E = 30, D4 = 28, D5 = 26, D6 = 24, D7 =  22
 LiquidCrystal lcd(34, 30, 28, 26, 24, 22);
 
-int previousmillisLCD = 0;
+int previousmillisLCD = 0; //variables used to control refresh rate of lcd and Voltrage sampling rate
 int currentmillisLCD;
 
-volatile int encoderValue = 0;
-int plusVoltage = 0;
-int minusVoltage = 0;
-const int coarseStep = 80;
-const int fineStep = 16;
+
+int plusVoltage = 0;		//digital values to be writtedn to DAC0
+int minusVoltage = 0;		//digital values to be writtedn to DAC1
+
+volatile int encoderValue = 0;		
+const int coarseStep = 50;		//Adjustment step of coarse encoder
+const int fineStep = 10;		//Adjustment step of fine encoder
 
 const int encoderCoarsePinA = 15;
 const int encoderCoarsePinB = 14;
@@ -49,8 +50,9 @@ const int encoderFinePinB = 18;
 
 #define VoltmeterPlus A6	// Positive output voltage is sampled at this pin 
 #define VoltmeterMinus A7	// Negative output voltage is sampled at this pin 
-int voltmeterPlusValue = 0;
-int voltmeterMinusValue = 0;
+short sampleNumbers = 32;	// take average of this number of samples of analog reading to make stable reading.
+int voltmeterPlusValue = 0;  //+output voltage to be displayed on lcd (in decimal)
+int voltmeterMinusValue = 0; //-output voltage to be displayed on lcd (in decimal)	
 
 
 #define CONVERSION_FACTOR_VPLUS 157.0
@@ -58,10 +60,18 @@ int voltmeterMinusValue = 0;
 //divide the analog read value of  VoltmeterPlus by this factor obtained by series divider of 15k ohm and 2.2k ohm
 //2.2/(15+2.2)*(4096/(3.3))
 
-char mode = 'A';
+//the power suppply work in four modes mode A = dual tracking
+//											 B = positive only adjust
+//											 C = Negative only adjust
+//											 D = Outputs are zero
+volatile char mode = 'A';			//default is dual tracking
 
 void setup()
 {
+	//use due's 12bit resolution for read and write
+	analogReadResolution(12);
+	analogWriteResolution(12);
+
 	const int RWpin = 32;			//RW pin(5) of LCD
 	pinMode(RWpin, OUTPUT);			//RW pin is not connected to GND as usual
 	digitalWrite(RWpin, LOW);		//make it low instead
@@ -78,26 +88,31 @@ void setup()
 
 	analogWrite(DAC0, 0);	//set output voltage to zero at begining
 	analogWrite(DAC1, 0);
+	delay(100);
 }
 
 void loop()
 {
-	//use due's 12bit resolution for read and write
-	analogReadResolution(12);
-	analogWriteResolution(12);
+	
 
-	//the power suppply work in three modes mode A = dual tracking
+	//the power suppply work in four modes mode A = dual tracking
 	//											 B = positive only adjust
-	//											 C = Negative only adjust	
+	//											 C = Negative only adjust
+	//											 D = Outputs are zero
 	
 	char keypressed = myKeypad.getKey();	
 	
 	if (keypressed != NO_KEY)
 	{
-		mode = keypressed;		
+		//Look only for mode keys ie A, B, C or D
+		if ((keypressed == 'A') || (keypressed == 'B') || (keypressed == 'C') || (keypressed == 'D'))
+		{
+			mode = keypressed;
+		}
+				
 	}
-
-	minusVoltage = encoderValue;
+	
+	minusVoltage = encoderValue;		
 	plusVoltage = (encoderValue)*18.33 / 20.0;  //to alingn same voltage per channel
 
 	switch (mode)
@@ -105,7 +120,7 @@ void loop()
 	case 'A':
 		
 		analogWrite(DAC0, plusVoltage);
-		analogWrite(DAC1, minusVoltage + 10);
+		analogWrite(DAC1, minusVoltage + 10);	//some trimming to equalize voltages
 		break;
 
 	case 'B':
@@ -115,18 +130,15 @@ void loop()
 
 	case 'C':
 		
-		analogWrite(DAC1, minusVoltage + 10);
+		analogWrite(DAC1, minusVoltage + 10);	//some trimming to equalize voltages
+		break;
+
+	case 'D':							
+		encoderValue = 0;					//All outputs are set to zero
+		analogWrite(DAC0, 0);
+		analogWrite(DAC1, 0);
 		break;
 	}
-
-
-/*	minusVoltage = encoderValue;
-	plusVoltage = (encoderValue)*18.33 / 20.0;  //to alingn same voltage per channel 
-	analogWrite(DAC0, plusVoltage);
-	analogWrite(DAC1, minusVoltage + 10);
-	*/
-
-
 
 	currentmillisLCD = millis();
 	if (currentmillisLCD - previousmillisLCD > 300)
@@ -136,14 +148,14 @@ void loop()
 		double vPlus = 0;
 		double vMinus = 0;
 
-		//Take 10 samples and average them for a stable value
-		for (int i = 0; i < 8; i++)
+		//Take samples and average them for a stable value
+		for (int i = 0; i < sampleNumbers; i++)
 		{
 			vPlus += analogRead(VoltmeterPlus);
 			vMinus += analogRead(VoltmeterMinus);
 		}
-		voltmeterPlusValue = vPlus / 8;
-		voltmeterMinusValue = vMinus / 8;
+		voltmeterPlusValue = vPlus / sampleNumbers;
+		voltmeterMinusValue = vMinus / sampleNumbers;
 
 		lcd.clear();
 		lcd.print(" V+ =  ");
@@ -166,6 +178,10 @@ void loop()
 		{
 			lcd.print("-ADJ");
 		}
+		else if (mode == 'D')
+		{
+			lcd.print("ZERO");
+		}
 
 		previousmillisLCD = currentmillisLCD;
 	}
@@ -174,10 +190,10 @@ void loop()
 
 void doEncoderCoarse()
 {
-	delayMicroseconds(50);
+	delayMicroseconds(300);			//Tweaked the delay to reduce jitter on coarse encoder
 	if (digitalRead(encoderCoarsePinA) == HIGH)
 	{
-		delayMicroseconds(50);
+		delayMicroseconds(300);		//Tweaked the delay to reduce jitter on coarse encoder
 		if (digitalRead(encoderCoarsePinB) == LOW)
 		{
 			if (encoderValue <= (4095 - coarseStep))
@@ -197,7 +213,7 @@ void doEncoderCoarse()
 	}
 	else
 	{
-		delayMicroseconds(50);
+		delayMicroseconds(300);			//Tweaked the delay to reduce jitter on coarse encoder
 		if (digitalRead(encoderCoarsePinB) == HIGH)
 		{
 			if (encoderValue <= (4095 - coarseStep))
@@ -217,10 +233,10 @@ void doEncoderCoarse()
 
 void doEncoderFine()
 {
-	delayMicroseconds(50);
+	delayMicroseconds(100);
 	if (digitalRead(encoderFinePinA) == HIGH)
 	{
-		delayMicroseconds(50);
+		delayMicroseconds(100);
 		if (digitalRead(encoderFinePinB) == LOW)
 		{
 			if (encoderValue <= (4095 - fineStep))
@@ -238,7 +254,7 @@ void doEncoderFine()
 	}
 	else
 	{
-		delayMicroseconds(50);
+		delayMicroseconds(100);
 		if (digitalRead(encoderFinePinB) == HIGH)
 		{
 			if (encoderValue <= (4095 - fineStep))
